@@ -1,0 +1,123 @@
+import 'package:flutter/material.dart';
+
+import '../models/medicine.dart';
+
+class WeeklyPage extends StatelessWidget {
+  final List<Medicine> medicines;
+
+  const WeeklyPage({
+    super.key,
+    required this.medicines,
+  });
+
+  static const List<String> dayNames = [
+    'Segunda-feira',
+    'Terça-feira',
+    'Quarta-feira',
+    'Quinta-feira',
+    'Sexta-feira',
+    'Sábado',
+    'Domingo',
+  ];
+
+  List<Medicine> _medicinesForDay(int day) {
+    final filtered = medicines
+        .where((medicine) => medicine.weekDays.contains(day))
+        .toList();
+
+    filtered.sort((a, b) => a.time.compareTo(b.time));
+
+    return filtered;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Remédios da semana'),
+      ),
+      body: ListView.builder(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
+        itemCount: 7,
+        itemBuilder: (context, index) {
+          final day = index + 1;
+          final dayMedicines = _medicinesForDay(day);
+
+          return Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color: const Color(0xFFE5E7EB),
+              ),
+            ),
+            child: ExpansionTile(
+              tilePadding: const EdgeInsets.symmetric(
+                horizontal: 18,
+                vertical: 6,
+              ),
+              childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 14),
+              title: Text(
+                dayNames[index],
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 17,
+                ),
+              ),
+              subtitle: Text(
+                dayMedicines.isEmpty
+                    ? 'Nenhum remédio'
+                    : '${dayMedicines.length} remédio(s)',
+                style: const TextStyle(
+                  color: Color(0xFF6B7280),
+                ),
+              ),
+              children: dayMedicines.isEmpty
+                  ? [
+                      const ListTile(
+                        title: Text(
+                          'Nenhum remédio cadastrado para este dia.',
+                          style: TextStyle(
+                            color: Color(0xFF6B7280),
+                          ),
+                        ),
+                      )
+                    ]
+                  : dayMedicines.map((medicine) {
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                        child: ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor: const Color(0xFFEFF6FF),
+                            child: Text(
+                              '${medicine.compartment}',
+                              style: const TextStyle(
+                                color: Color(0xFF0A6CFF),
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          title: Text(
+                            medicine.name,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          subtitle: Text(
+                            '${medicine.dosage} • ${medicine.time}',
+                          ),
+                        ),
+                      );
+                    }).toList(),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
