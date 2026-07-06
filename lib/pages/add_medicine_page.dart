@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/medicine.dart';
+import '../services/medicine_service.dart';
 
 class AddMedicinePage extends StatefulWidget {
   const AddMedicinePage({super.key});
@@ -58,7 +59,9 @@ class _AddMedicinePageState extends State<AddMedicinePage> {
     return '$hour:$minute';
   }
 
-  void _save() {
+  bool _isLoading = false;
+
+  Future<void> _save() async {
     if (_nameController.text.trim().isEmpty) {
       _showError('Informe o nome do remédio.');
       return;
@@ -74,17 +77,34 @@ class _AddMedicinePageState extends State<AddMedicinePage> {
       return;
     }
 
-    final medicine = Medicine(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      name: _nameController.text.trim(),
-      dosage: _dosageController.text.trim(),
-      compartment: _selectedCompartment,
-      time: _formatTime(_selectedTime),
-      weekDays: List.from(_selectedDays)..sort(),
-      notes: _notesController.text.trim(),
-    );
+    setState(() {
+      _isLoading = true;
+    });
 
-    Navigator.pop(context, medicine);
+    try {
+      // Cria o objeto localmente ignorando o ID falso (será descartado no toJSON)
+      final medicine = Medicine(
+        id: '', 
+        name: _nameController.text.trim(),
+        dosage: _dosageController.text.trim(),
+        compartment: _selectedCompartment,
+        scheduledTime: _formatTime(_selectedTime),
+        weekDays: List.from(_selectedDays)..sort(),
+        notes: _notesController.text.trim().isNotEmpty ? _notesController.text.trim() : null,
+      );
+
+      final createdMedicine = await MedicineService().createMedicine(medicine);
+
+      if (!mounted) return;
+      Navigator.pop(context, createdMedicine);
+    } catch (e) {
+      _showError(e.toString());
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   void _showError(String message) {
@@ -261,11 +281,13 @@ class _AddMedicinePageState extends State<AddMedicinePage> {
             ),
           ),
           const SizedBox(height: 24),
-          FilledButton.icon(
-            onPressed: _save,
-            icon: const Icon(Icons.save),
-            label: const Text('Salvar remédio'),
-          ),
+          _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : FilledButton.icon(
+                  onPressed: _save,
+                  icon: const Icon(Icons.save),
+                  label: const Text('Salvar remédio'),
+                ),
         ],
       ),
     );

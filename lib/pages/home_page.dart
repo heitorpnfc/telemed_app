@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/day_status.dart';
 import '../models/medicine.dart';
 import '../services/auth_service.dart';
+import '../services/medicine_service.dart';
 import '../widgets/week_status_bar.dart';
 import 'add_medicine_page.dart';
 import 'box_page.dart';
@@ -17,8 +18,38 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  final List<Medicine> _medicines = [];
+  List<Medicine> _medicines = [];
+  bool _isLoading = true;
 
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    try {
+      final medicines = await MedicineService().getMedicines();
+      if (mounted) {
+        setState(() {
+          _medicines = medicines;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro ao carregar remédios: $e')),
+        );
+      }
+    }
+  }
+
+  // Comentado conforme pedido para focar apenas nos remédios
+  /*
   final List<DayStatusData> _weekStatus = [
     DayStatusData(
       weekday: 1,
@@ -101,6 +132,7 @@ class _HomePageState extends State<HomePage> {
       ],
     ),
   ];
+  */
 
   Medicine? get _nextMedicine {
     final today = DateTime.now().weekday;
@@ -109,7 +141,7 @@ class _HomePageState extends State<HomePage> {
         .where((medicine) => medicine.weekDays.contains(today))
         .toList();
 
-    todayMedicines.sort((a, b) => a.time.compareTo(b.time));
+    todayMedicines.sort((a, b) => a.scheduledTime.compareTo(b.scheduledTime));
 
     if (todayMedicines.isEmpty) return null;
 
@@ -294,7 +326,7 @@ class _HomePageState extends State<HomePage> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        '${nextMedicine.dosage} • ${nextMedicine.time} • Compartimento ${nextMedicine.compartment}',
+                        '${nextMedicine.dosage} • ${nextMedicine.scheduledTime} • Compartimento ${nextMedicine.compartment}',
                         style: const TextStyle(
                           color: Color(0xFF6B7280),
                         ),
@@ -426,7 +458,7 @@ class _HomePageState extends State<HomePage> {
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      '${medicine.dosage} • ${medicine.time}',
+                      '${medicine.dosage} • ${medicine.scheduledTime}',
                       style: const TextStyle(
                         color: Color(0xFF6B7280),
                       ),
@@ -435,10 +467,19 @@ class _HomePageState extends State<HomePage> {
                 ),
               ),
               IconButton(
-                onPressed: () {
-                  setState(() {
-                    _medicines.remove(medicine);
-                  });
+                onPressed: () async {
+                  try {
+                    await MedicineService().deleteMedicine(medicine.id);
+                    setState(() {
+                      _medicines.remove(medicine);
+                    });
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Erro ao deletar: $e')),
+                      );
+                    }
+                  }
                 },
                 icon: const Icon(
                   Icons.delete_outline,
@@ -474,6 +515,7 @@ class _HomePageState extends State<HomePage> {
         children: [
           _buildHeaderCard(),
           const SizedBox(height: 22),
+          /*
           const Text(
             'Resumo da semana',
             style: TextStyle(
@@ -484,6 +526,7 @@ class _HomePageState extends State<HomePage> {
           const SizedBox(height: 12),
           WeekStatusBar(days: _weekStatus),
           const SizedBox(height: 22),
+          */
           _buildNextMedicineCard(),
           const SizedBox(height: 22),
           _buildActionButton(
@@ -533,7 +576,9 @@ class _HomePageState extends State<HomePage> {
             ),
           ),
           const SizedBox(height: 12),
-          _buildMedicinesList(),
+          _isLoading 
+              ? const Center(child: CircularProgressIndicator()) 
+              : _buildMedicinesList(),
         ],
       ),
     );
