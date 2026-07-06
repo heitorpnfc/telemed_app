@@ -25,7 +25,7 @@ class WeeklyPage extends StatelessWidget {
         .where((medicine) => medicine.weekDays.contains(day))
         .toList();
 
-    filtered.sort((a, b) => a.time.compareTo(b.time));
+    filtered.sort((a, b) => a.scheduledTime.compareTo(b.scheduledTime));
 
     return filtered;
   }
@@ -109,7 +109,7 @@ class WeeklyPage extends StatelessWidget {
                             ),
                           ),
                           subtitle: Text(
-                            '${medicine.dosage} • ${medicine.time}',
+                            '${medicine.dosage} • ${medicine.scheduledTime}',
                           ),
                         ),
                       );
