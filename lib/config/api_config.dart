@@ -1,6 +1,10 @@
 class ApiConfig {
+  // O aplicativo conectará em produção (VPS) por padrão.
+  // Para testar usando Ngrok localmente, execute o app no terminal da seguinte forma:
+  // flutter run --dart-define=API_BASE_URL=https://seu-endereco-ngrok.ngrok-free.app
+  
   static const String baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://10.0.2.2:7878',
+    defaultValue: 'https://remindcare.com.br',
   );
 }
