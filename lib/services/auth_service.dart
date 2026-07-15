@@ -1,20 +1,9 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-
-import '../config/api_config.dart';
+import 'api_client.dart';
 
 class AuthService {
-  final Dio _dio = Dio(
-    BaseOptions(
-      baseUrl: ApiConfig.baseUrl,
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      connectTimeout: const Duration(seconds: 10),
-      receiveTimeout: const Duration(seconds: 10),
-    ),
-  );
-
+  final Dio _dio = ApiClient().dio;
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
 
   Future<void> login({

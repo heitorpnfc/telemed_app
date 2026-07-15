@@ -15,7 +15,7 @@ class BoxPage extends StatelessWidget {
         .where((medicine) => medicine.compartment == compartment)
         .toList();
 
-    filtered.sort((a, b) => a.time.compareTo(b.time));
+    filtered.sort((a, b) => a.scheduledTime.compareTo(b.scheduledTime));
 
     return filtered;
   }
@@ -112,7 +112,7 @@ class BoxPage extends StatelessWidget {
                               borderRadius: BorderRadius.circular(14),
                             ),
                             child: Text(
-                              '${medicine.time} - ${medicine.name}',
+                              '${medicine.scheduledTime} - ${medicine.name}',
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
