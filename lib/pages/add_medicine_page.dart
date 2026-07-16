@@ -1,41 +1,68 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../models/medicine.dart';
 import '../services/medicine_service.dart';
 
 class AddMedicinePage extends StatefulWidget {
-  const AddMedicinePage({super.key});
+  final Medicine? medicine;
+  const AddMedicinePage({super.key, this.medicine});
 
   @override
   State<AddMedicinePage> createState() => _AddMedicinePageState();
 }
 
 class _AddMedicinePageState extends State<AddMedicinePage> {
-  final _nameController = TextEditingController();
+  String _currentName = '';
   final _dosageController = TextEditingController();
   final _notesController = TextEditingController();
 
   int _selectedCompartment = 1;
   TimeOfDay _selectedTime = const TimeOfDay(hour: 8, minute: 0);
-
   final List<int> _selectedDays = [];
+  List<String> _medicineOptions = [];
+  bool _isLoading = false;
 
   final List<String> _dayNames = [
-    'Seg',
-    'Ter',
-    'Qua',
-    'Qui',
-    'Sex',
-    'Sáb',
-    'Dom',
+    'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom',
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadBulario();
+    
+    if (widget.medicine != null) {
+      _currentName = widget.medicine!.name;
+      _dosageController.text = widget.medicine!.dosage;
+      _notesController.text = widget.medicine!.notes ?? '';
+      _selectedCompartment = widget.medicine!.compartment;
+      final parts = widget.medicine!.scheduledTime.split(':');
+      if (parts.length >= 2) {
+        _selectedTime = TimeOfDay(hour: int.parse(parts[0]), minute: int.parse(parts[1]));
+      }
+      _selectedDays.addAll(widget.medicine!.weekDays);
+    }
+  }
+
+  Future<void> _loadBulario() async {
+    try {
+      final String jsonString = await rootBundle.loadString('assets/bulario_brasil.json');
+      final List<dynamic> jsonList = jsonDecode(jsonString);
+      setState(() {
+        _medicineOptions = jsonList.cast<String>();
+      });
+    } catch (e) {
+      debugPrint('Erro ao carregar bulário: $e');
+    }
+  }
 
   Future<void> _pickTime() async {
     final result = await showTimePicker(
       context: context,
       initialTime: _selectedTime,
     );
-
     if (result != null) {
       setState(() {
         _selectedTime = result;
@@ -59,19 +86,15 @@ class _AddMedicinePageState extends State<AddMedicinePage> {
     return '$hour:$minute';
   }
 
-  bool _isLoading = false;
-
   Future<void> _save() async {
-    if (_nameController.text.trim().isEmpty) {
+    if (_currentName.trim().isEmpty) {
       _showError('Informe o nome do remédio.');
       return;
     }
-
     if (_dosageController.text.trim().isEmpty) {
       _showError('Informe a dosagem.');
       return;
     }
-
     if (_selectedDays.isEmpty) {
       _showError('Selecione pelo menos um dia da semana.');
       return;
@@ -82,10 +105,9 @@ class _AddMedicinePageState extends State<AddMedicinePage> {
     });
 
     try {
-      // Cria o objeto localmente ignorando o ID falso (será descartado no toJSON)
       final medicine = Medicine(
-        id: '', 
-        name: _nameController.text.trim(),
+        id: widget.medicine?.id ?? '', 
+        name: _currentName.trim(),
         dosage: _dosageController.text.trim(),
         compartment: _selectedCompartment,
         scheduledTime: _formatTime(_selectedTime),
@@ -93,10 +115,12 @@ class _AddMedicinePageState extends State<AddMedicinePage> {
         notes: _notesController.text.trim().isNotEmpty ? _notesController.text.trim() : null,
       );
 
-      final createdMedicine = await MedicineService().createMedicine(medicine);
+      final savedMedicine = widget.medicine == null
+          ? await MedicineService().createMedicine(medicine)
+          : await MedicineService().updateMedicine(medicine);
 
       if (!mounted) return;
-      Navigator.pop(context, createdMedicine);
+      Navigator.pop(context, savedMedicine);
     } catch (e) {
       _showError(e.toString());
       if (mounted) {
@@ -118,7 +142,6 @@ class _AddMedicinePageState extends State<AddMedicinePage> {
 
   @override
   void dispose() {
-    _nameController.dispose();
     _dosageController.dispose();
     _notesController.dispose();
     super.dispose();
@@ -127,7 +150,6 @@ class _AddMedicinePageState extends State<AddMedicinePage> {
   Widget _buildDayChip(int index) {
     final day = index + 1;
     final selected = _selectedDays.contains(day);
-
     return FilterChip(
       label: Text(_dayNames[index]),
       selected: selected,
@@ -144,10 +166,11 @@ class _AddMedicinePageState extends State<AddMedicinePage> {
   @override
   Widget build(BuildContext context) {
     final formattedTime = _formatTime(_selectedTime);
+    final isEditing = widget.medicine != null;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Adicionar remédio'),
+        title: Text(isEditing ? 'Editar remédio' : 'Adicionar remédio'),
       ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
@@ -163,12 +186,56 @@ class _AddMedicinePageState extends State<AddMedicinePage> {
             ),
             child: Column(
               children: [
-                TextField(
-                  controller: _nameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Nome do remédio',
-                    prefixIcon: Icon(Icons.medication_outlined),
-                  ),
+                Autocomplete<String>(
+                  initialValue: TextEditingValue(text: _currentName),
+                  optionsBuilder: (TextEditingValue textEditingValue) {
+                    _currentName = textEditingValue.text;
+                    if (textEditingValue.text.isEmpty) {
+                      return const Iterable<String>.empty();
+                    }
+                    return _medicineOptions.where((String option) {
+                      return option.toLowerCase().contains(textEditingValue.text.toLowerCase());
+                    });
+                  },
+                  onSelected: (String selection) {
+                    _currentName = selection;
+                  },
+                  optionsViewBuilder: (context, onSelected, options) {
+                    return Align(
+                      alignment: Alignment.topLeft,
+                      child: Material(
+                        elevation: 4.0,
+                        borderRadius: BorderRadius.circular(16),
+                        clipBehavior: Clip.antiAlias,
+                        child: SizedBox(
+                          height: 200.0,
+                          child: ListView.builder(
+                            padding: EdgeInsets.zero,
+                            itemCount: options.length,
+                            itemBuilder: (BuildContext context, int index) {
+                              final String option = options.elementAt(index);
+                              return ListTile(
+                                title: Text(option),
+                                onTap: () => onSelected(option),
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                  fieldViewBuilder: (context, controller, focusNode, onEditingComplete) {
+                    return TextField(
+                      controller: controller,
+                      focusNode: focusNode,
+                      onChanged: (val) => _currentName = val,
+                      decoration: const InputDecoration(
+                        labelText: 'Nome do remédio',
+                        hintText: 'Pesquise ou digite o nome',
+                        prefixIcon: Icon(Icons.medication_outlined),
+                      ),
+                    );
+                  },
                 ),
                 const SizedBox(height: 14),
                 TextField(
@@ -274,7 +341,7 @@ class _AddMedicinePageState extends State<AddMedicinePage> {
             controller: _notesController,
             maxLines: 4,
             decoration: const InputDecoration(
-              labelText: 'Observações',
+              labelText: 'Observações (Opcional)',
               hintText: 'Ex: tomar após o café',
               alignLabelWithHint: true,
               prefixIcon: Icon(Icons.notes_outlined),
@@ -286,7 +353,7 @@ class _AddMedicinePageState extends State<AddMedicinePage> {
               : FilledButton.icon(
                   onPressed: _save,
                   icon: const Icon(Icons.save),
-                  label: const Text('Salvar remédio'),
+                  label: Text(isEditing ? 'Salvar alterações' : 'Salvar remédio'),
                 ),
         ],
       ),

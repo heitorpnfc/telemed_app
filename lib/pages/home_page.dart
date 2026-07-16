@@ -4,11 +4,16 @@ import '../models/day_status.dart';
 import '../models/medicine.dart';
 import '../services/auth_service.dart';
 import '../services/medicine_service.dart';
-import '../widgets/week_status_bar.dart';
+import '../widgets/adherence_dashboard.dart';
 import 'add_medicine_page.dart';
+import 'device_bind_page.dart';
+import 'medicine_details_modal.dart';
+import 'timeline_page.dart';
 import 'box_page.dart';
 import 'login_page.dart';
+import 'profile_page.dart';
 import 'weekly_page.dart';
+import '../services/notification_service.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -20,6 +25,7 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   List<Medicine> _medicines = [];
   bool _isLoading = true;
+  int _dashboardKey = 0;
 
   @override
   void initState() {
@@ -35,6 +41,7 @@ class _HomePageState extends State<HomePage> {
           _medicines = medicines;
           _isLoading = false;
         });
+        NotificationService().scheduleMedicineAlarms(medicines);
       }
     } catch (e) {
       if (mounted) {
@@ -135,7 +142,10 @@ class _HomePageState extends State<HomePage> {
   */
 
   Medicine? get _nextMedicine {
-    final today = DateTime.now().weekday;
+    final now = DateTime.now();
+    final today = now.weekday;
+    final currentTimeString =
+        '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
 
     final todayMedicines = _medicines
         .where((medicine) => medicine.weekDays.contains(today))
@@ -143,9 +153,19 @@ class _HomePageState extends State<HomePage> {
 
     todayMedicines.sort((a, b) => a.scheduledTime.compareTo(b.scheduledTime));
 
-    if (todayMedicines.isEmpty) return null;
+    // Pega o primeiro remédio cujo horário é maior que o horário atual
+    final upcoming = todayMedicines
+        .where((m) => m.scheduledTime.compareTo(currentTimeString) > 0)
+        .toList();
 
-    return todayMedicines.first;
+    if (upcoming.isNotEmpty) {
+      return upcoming.first;
+    }
+
+    // Se todos de hoje já passaram, retorna o primeiro do dia (que será o da próxima semana)
+    if (todayMedicines.isNotEmpty) return todayMedicines.first;
+
+    return null;
   }
 
   Future<void> _addMedicine() async {
@@ -159,7 +179,9 @@ class _HomePageState extends State<HomePage> {
     if (result != null) {
       setState(() {
         _medicines.add(result);
+        _dashboardKey++;
       });
+      NotificationService().scheduleMedicineAlarms(_medicines);
     }
   }
 
@@ -446,32 +468,70 @@ class _HomePageState extends State<HomePage> {
               ),
               const SizedBox(width: 14),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      medicine.name,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
+                child: InkWell(
+                  onTap: () {
+                    MedicineDetailsModal.show(
+                      context,
+                      medicine: medicine,
+                      onEdit: () async {
+                        final result = await Navigator.push<Medicine>(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => AddMedicinePage(medicine: medicine),
+                          ),
+                        );
+                        if (result != null) {
+                          _loadData();
+                          setState(() {
+                            _dashboardKey++;
+                          });
+                        }
+                      },
+                      onDelete: () async {
+                        try {
+                          await MedicineService().deleteMedicine(medicine.id);
+                          _loadData();
+                          setState(() {
+                            _dashboardKey++;
+                          });
+                        } catch (e) {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Erro ao deletar: $e')),
+                            );
+                          }
+                        }
+                      },
+                    );
+                  },
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        medicine.name,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      '${medicine.dosage} • ${medicine.scheduledTime}',
-                      style: const TextStyle(
-                        color: Color(0xFF6B7280),
+                      const SizedBox(height: 3),
+                      Text(
+                        '${medicine.dosage} • ${medicine.scheduledTime}',
+                        style: const TextStyle(
+                          color: Color(0xFF6B7280),
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
               IconButton(
                 onPressed: () async {
                   try {
                     await MedicineService().deleteMedicine(medicine.id);
+                    _loadData();
                     setState(() {
-                      _medicines.remove(medicine);
+                      _dashboardKey++;
                     });
                   } catch (e) {
                     if (mounted) {
@@ -505,8 +565,14 @@ class _HomePageState extends State<HomePage> {
         title: const Text('RemindCare'),
         actions: [
           IconButton(
-            onPressed: _logout,
-            icon: const Icon(Icons.logout),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ProfilePage()),
+              );
+            },
+            icon: const Icon(Icons.person),
+            tooltip: 'Meu Perfil',
           ),
         ],
       ),
@@ -515,7 +581,6 @@ class _HomePageState extends State<HomePage> {
         children: [
           _buildHeaderCard(),
           const SizedBox(height: 22),
-          /*
           const Text(
             'Resumo da semana',
             style: TextStyle(
@@ -523,10 +588,9 @@ class _HomePageState extends State<HomePage> {
               fontWeight: FontWeight.bold,
             ),
           ),
-          const SizedBox(height: 12),
-          WeekStatusBar(days: _weekStatus),
-          const SizedBox(height: 22),
-          */
+          const SizedBox(height: 14),
+          AdherenceDashboard(key: ValueKey(_dashboardKey)),
+          const SizedBox(height: 24),
           _buildNextMedicineCard(),
           const SizedBox(height: 22),
           _buildActionButton(
@@ -564,6 +628,34 @@ class _HomePageState extends State<HomePage> {
                     medicines: _medicines,
                   ),
                 ),
+              );
+            },
+          ),
+          const SizedBox(height: 10),
+          _buildActionButton(
+            icon: Icons.history,
+            title: 'Histórico de hoje',
+            subtitle: 'Veja os horários em que a caixinha foi aberta hoje.',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const TimelinePage()),
+              ).then((_) {
+                setState(() {
+                  _dashboardKey++;
+                });
+              });
+            },
+          ),
+          const SizedBox(height: 10),
+          _buildActionButton(
+            icon: Icons.qr_code_scanner,
+            title: 'Parear Caixinha',
+            subtitle: 'Conecte sua caixa IoT ao seu perfil.',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const DeviceBindPage()),
               );
             },
           ),
