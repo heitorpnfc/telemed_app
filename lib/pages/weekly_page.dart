@@ -43,15 +43,18 @@ class WeeklyPage extends StatelessWidget {
           final day = index + 1;
           final dayMedicines = _medicinesForDay(day);
 
-          return Container(
-            margin: const EdgeInsets.only(bottom: 12),
-            decoration: BoxDecoration(
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Material(
               color: Colors.white,
               borderRadius: BorderRadius.circular(24),
-              border: Border.all(
-                color: const Color(0xFFE5E7EB),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24),
+                side: const BorderSide(
+                  color: Color(0xFFE5E7EB),
+                ),
               ),
-            ),
+              clipBehavior: Clip.antiAlias,
             child: ExpansionTile(
               tilePadding: const EdgeInsets.symmetric(
                 horizontal: 18,
@@ -85,12 +88,12 @@ class WeeklyPage extends StatelessWidget {
                       )
                     ]
                   : dayMedicines.map((medicine) {
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 8),
-                        decoration: BoxDecoration(
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Material(
                           color: const Color(0xFFF8FAFC),
                           borderRadius: BorderRadius.circular(18),
-                        ),
+                          clipBehavior: Clip.antiAlias,
                         child: ListTile(
                           leading: CircleAvatar(
                             backgroundColor: const Color(0xFFEFF6FF),
@@ -112,8 +115,10 @@ class WeeklyPage extends StatelessWidget {
                             '${medicine.dosage} • ${medicine.scheduledTime}',
                           ),
                         ),
+                       ),
                       );
                     }).toList(),
+              ),
             ),
           );
         },

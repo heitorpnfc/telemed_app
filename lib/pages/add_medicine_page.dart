@@ -1,42 +1,68 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../models/medicine.dart';
 import '../services/medicine_service.dart';
-import '../models/bula.dart'; // <-- Importando o Model da Bula
-import '../services/bula_service.dart'; // <-- Importando o Service da Bula
 
 class AddMedicinePage extends StatefulWidget {
-  const AddMedicinePage({super.key});
+  final Medicine? medicine;
+  const AddMedicinePage({super.key, this.medicine});
 
   @override
   State<AddMedicinePage> createState() => _AddMedicinePageState();
 }
 
 class _AddMedicinePageState extends State<AddMedicinePage> {
-  // Instância do serviço que busca as bulas
-  final BulaService _bulaService = BulaService();
-  
-  // O Autocomplete gerencia o próprio controller, então salvamos a referência dele aqui
-  TextEditingController? _nomeRemedioController;
-  
+  String _currentName = '';
   final _dosageController = TextEditingController();
   final _notesController = TextEditingController();
 
   int _selectedCompartment = 1;
   TimeOfDay _selectedTime = const TimeOfDay(hour: 8, minute: 0);
-
   final List<int> _selectedDays = [];
+  List<String> _medicineOptions = [];
+  bool _isLoading = false;
 
   final List<String> _dayNames = [
     'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom',
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadBulario();
+    
+    if (widget.medicine != null) {
+      _currentName = widget.medicine!.name;
+      _dosageController.text = widget.medicine!.dosage;
+      _notesController.text = widget.medicine!.notes ?? '';
+      _selectedCompartment = widget.medicine!.compartment;
+      final parts = widget.medicine!.scheduledTime.split(':');
+      if (parts.length >= 2) {
+        _selectedTime = TimeOfDay(hour: int.parse(parts[0]), minute: int.parse(parts[1]));
+      }
+      _selectedDays.addAll(widget.medicine!.weekDays);
+    }
+  }
+
+  Future<void> _loadBulario() async {
+    try {
+      final String jsonString = await rootBundle.loadString('assets/bulario_brasil.json');
+      final List<dynamic> jsonList = jsonDecode(jsonString);
+      setState(() {
+        _medicineOptions = jsonList.cast<String>();
+      });
+    } catch (e) {
+      debugPrint('Erro ao carregar bulário: $e');
+    }
+  }
 
   Future<void> _pickTime() async {
     final result = await showTimePicker(
       context: context,
       initialTime: _selectedTime,
     );
-
     if (result != null) {
       setState(() {
         _selectedTime = result;
@@ -60,22 +86,15 @@ class _AddMedicinePageState extends State<AddMedicinePage> {
     return '$hour:$minute';
   }
 
-  bool _isLoading = false;
-
   Future<void> _save() async {
-    // Pega o texto do controller do Autocomplete
-    final nomeRemedio = _nomeRemedioController?.text.trim() ?? '';
-
-    if (nomeRemedio.isEmpty) {
+    if (_currentName.trim().isEmpty) {
       _showError('Informe o nome do remédio.');
       return;
     }
-
     if (_dosageController.text.trim().isEmpty) {
       _showError('Informe a dosagem.');
       return;
     }
-
     if (_selectedDays.isEmpty) {
       _showError('Selecione pelo menos um dia da semana.');
       return;
@@ -87,8 +106,8 @@ class _AddMedicinePageState extends State<AddMedicinePage> {
 
     try {
       final medicine = Medicine(
-        id: '',
-        name: nomeRemedio, // Usando o nome buscado
+        id: widget.medicine?.id ?? '', 
+        name: _currentName.trim(),
         dosage: _dosageController.text.trim(),
         compartment: _selectedCompartment,
         scheduledTime: _formatTime(_selectedTime),
@@ -96,10 +115,12 @@ class _AddMedicinePageState extends State<AddMedicinePage> {
         notes: _notesController.text.trim().isNotEmpty ? _notesController.text.trim() : null,
       );
 
-      final createdMedicine = await MedicineService().createMedicine(medicine);
+      final savedMedicine = widget.medicine == null
+          ? await MedicineService().createMedicine(medicine)
+          : await MedicineService().updateMedicine(medicine);
 
       if (!mounted) return;
-      Navigator.pop(context, createdMedicine);
+      Navigator.pop(context, savedMedicine);
     } catch (e) {
       _showError(e.toString());
       if (mounted) {
@@ -123,14 +144,12 @@ class _AddMedicinePageState extends State<AddMedicinePage> {
   void dispose() {
     _dosageController.dispose();
     _notesController.dispose();
-    // Não damos dispose no _nomeRemedioController pois o Autocomplete gerencia isso internamente
     super.dispose();
   }
 
   Widget _buildDayChip(int index) {
     final day = index + 1;
     final selected = _selectedDays.contains(day);
-
     return FilterChip(
       label: Text(_dayNames[index]),
       selected: selected,
@@ -147,10 +166,11 @@ class _AddMedicinePageState extends State<AddMedicinePage> {
   @override
   Widget build(BuildContext context) {
     final formattedTime = _formatTime(_selectedTime);
+    final isEditing = widget.medicine != null;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Adicionar remédio'),
+        title: Text(isEditing ? 'Editar remédio' : 'Adicionar remédio'),
       ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
@@ -166,91 +186,36 @@ class _AddMedicinePageState extends State<AddMedicinePage> {
             ),
             child: Column(
               children: [
-                
-                // --- CAMPO DE AUTOCOMPLETAR (BULÁRIO ANVISA) ---
-                Autocomplete<Bula>(
-                  displayStringForOption: (Bula option) => option.nomeProduto,
-                  optionsBuilder: (TextEditingValue textEditingValue) async {
-                    // Começa a buscar na API apenas após 3 letras digitadas para economizar dados
-                    if (textEditingValue.text.length < 3) {
-                      return const Iterable<Bula>.empty();
+                Autocomplete<String>(
+                  initialValue: TextEditingValue(text: _currentName),
+                  optionsBuilder: (TextEditingValue textEditingValue) {
+                    _currentName = textEditingValue.text;
+                    if (textEditingValue.text.isEmpty) {
+                      return const Iterable<String>.empty();
                     }
-                    try {
-                      return await _bulaService.pesquisarMedicamento(textEditingValue.text);
-                    } catch (e) {
-                      return const Iterable<Bula>.empty();
-                    }
-                  },
-                  onSelected: (Bula selecao) {
-                    // Quando escolhe o remédio, preenchemos o campo de observações com a bula!
-                    setState(() {
-                      String infoExtra = 'Fabricante: ${selecao.razaoSocial}';
-                      
-                      if (selecao.idBulaPacienteProtegido != null) {
-                        final linkBula = _bulaService.obterUrlPdf(selecao.idBulaPacienteProtegido!);
-                        infoExtra += '\nBula: $linkBula';
-                      }
-
-                      // Concatena com o que já estiver escrito nas observações
-                      if (_notesController.text.isEmpty) {
-                        _notesController.text = infoExtra;
-                      } else {
-                        _notesController.text = '${_notesController.text}\n\n$infoExtra';
-                      }
+                    return _medicineOptions.where((String option) {
+                      return option.toLowerCase().contains(textEditingValue.text.toLowerCase());
                     });
-
-                    // Mostra um aviso verde de sucesso
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('${selecao.nomeProduto} importado!'),
-                        backgroundColor: Colors.green,
-                        duration: const Duration(seconds: 2),
-                      ),
-                    );
                   },
-                  fieldViewBuilder: (context, textEditingController, focusNode, onFieldSubmitted) {
-                    // Guarda o controller criado pelo Autocomplete para usarmos no _save()
-                    _nomeRemedioController = textEditingController;
-
-                    return TextField(
-                      controller: textEditingController,
-                      focusNode: focusNode,
-                      decoration: const InputDecoration(
-                        labelText: 'Nome do remédio',
-                        hintText: 'Digite para buscar na ANVISA...',
-                        prefixIcon: Icon(Icons.medication_outlined),
-                      ),
-                    );
+                  onSelected: (String selection) {
+                    _currentName = selection;
                   },
                   optionsViewBuilder: (context, onSelected, options) {
-                    // O design da caixinha de sugestões flutuante
                     return Align(
                       alignment: Alignment.topLeft,
                       child: Material(
                         elevation: 4.0,
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(16),
+                        clipBehavior: Clip.antiAlias,
                         child: SizedBox(
-                          // Ajusta a largura da lista para encaixar no seu layout
-                          width: MediaQuery.of(context).size.width - 68, 
-                          height: 250,
-                          child: ListView.separated(
+                          height: 200.0,
+                          child: ListView.builder(
                             padding: EdgeInsets.zero,
                             itemCount: options.length,
-                            separatorBuilder: (context, index) => const Divider(height: 1),
                             itemBuilder: (BuildContext context, int index) {
-                              final Bula option = options.elementAt(index);
+                              final String option = options.elementAt(index);
                               return ListTile(
-                                leading: const Icon(Icons.search, color: Color(0xFF0A6CFF)),
-                                title: Text(
-                                  option.nomeProduto, 
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                                ),
-                                subtitle: Text(
-                                  option.razaoSocial,
-                                  style: const TextStyle(fontSize: 12),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
+                                title: Text(option),
                                 onTap: () => onSelected(option),
                               );
                             },
@@ -259,9 +224,19 @@ class _AddMedicinePageState extends State<AddMedicinePage> {
                       ),
                     );
                   },
+                  fieldViewBuilder: (context, controller, focusNode, onEditingComplete) {
+                    return TextField(
+                      controller: controller,
+                      focusNode: focusNode,
+                      onChanged: (val) => _currentName = val,
+                      decoration: const InputDecoration(
+                        labelText: 'Nome do remédio',
+                        hintText: 'Pesquise ou digite o nome',
+                        prefixIcon: Icon(Icons.medication_outlined),
+                      ),
+                    );
+                  },
                 ),
-                // ------------------------------------------------
-                
                 const SizedBox(height: 14),
                 TextField(
                   controller: _dosageController,
@@ -366,7 +341,7 @@ class _AddMedicinePageState extends State<AddMedicinePage> {
             controller: _notesController,
             maxLines: 4,
             decoration: const InputDecoration(
-              labelText: 'Observações',
+              labelText: 'Observações (Opcional)',
               hintText: 'Ex: tomar após o café',
               alignLabelWithHint: true,
               prefixIcon: Icon(Icons.notes_outlined),
@@ -378,7 +353,7 @@ class _AddMedicinePageState extends State<AddMedicinePage> {
               : FilledButton.icon(
                   onPressed: _save,
                   icon: const Icon(Icons.save),
-                  label: const Text('Salvar remédio'),
+                  label: Text(isEditing ? 'Salvar alterações' : 'Salvar remédio'),
                 ),
         ],
       ),

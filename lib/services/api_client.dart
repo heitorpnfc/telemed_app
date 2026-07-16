@@ -37,7 +37,31 @@ class ApiClient {
         return handler.next(options);
       },
       onError: (DioException e, handler) async {
-        // Futuro: Implementar lógica de Refresh Token aqui se receber 401 Unauthorized
+        if (e.response?.statusCode == 401 && !e.requestOptions.path.contains('/auth/')) {
+          final refreshToken = await _storage.read(key: 'refresh_token');
+          if (refreshToken != null) {
+            try {
+              // Usa uma nova instância do Dio para evitar loops de interceptor
+              final refreshDio = Dio(BaseOptions(baseUrl: ApiConfig.baseUrl));
+              final response = await refreshDio.post(
+                '/auth/refresh',
+                data: {'refresh_token': refreshToken},
+              );
+              
+              final newAccessToken = response.data['access_token'];
+              await _storage.write(key: 'access_token', value: newAccessToken);
+              
+              // Refaz a requisição original com o novo token
+              e.requestOptions.headers['Authorization'] = 'Bearer $newAccessToken';
+              final retryResponse = await dio.fetch(e.requestOptions);
+              return handler.resolve(retryResponse);
+            } catch (_) {
+              // Se o refresh falhar, limpa os tokens
+              await _storage.delete(key: 'access_token');
+              await _storage.delete(key: 'refresh_token');
+            }
+          }
+        }
         return handler.next(e);
       },
     ));

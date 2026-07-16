@@ -41,6 +41,53 @@ class MedicineService {
     }
   }
 
+  Future<Medicine> updateMedicine(Medicine medicine) async {
+    try {
+      final response = await _dio.put(
+        '/medicines/${medicine.id}',
+        data: medicine.toJson()..remove('id'),
+      );
+      return Medicine.fromJson(response.data);
+    } on DioException catch (e) {
+      throw Exception(_getErrorMessage(e));
+    }
+  }
+
+  Future<Medicine> getMedicineById(String id) async {
+    try {
+      final response = await _dio.get('/medicines/$id');
+      return Medicine.fromJson(response.data);
+    } on DioException catch (e) {
+      throw Exception(_getErrorMessage(e));
+    }
+  }
+
+  Future<List<dynamic>> getMedicineLogs() async {
+    try {
+      final response = await _dio.get('/medicines/logs');
+      if (response.data is List) {
+        return response.data as List<dynamic>;
+      }
+      return [];
+    } on DioException catch (e) {
+      throw Exception(_getErrorMessage(e));
+    }
+  }
+
+  Future<void> registerManualLog(String medicineId, String situation) async {
+    try {
+      await _dio.post(
+        '/medicines/logs',
+        data: {
+          'medicine_id': medicineId,
+          'situation': situation, // "onTime", "late", "warning"
+        },
+      );
+    } on DioException catch (e) {
+      throw Exception(_getErrorMessage(e));
+    }
+  }
+
   String _getErrorMessage(DioException e) {
     final data = e.response?.data;
     if (data is Map && data['error'] != null) {
