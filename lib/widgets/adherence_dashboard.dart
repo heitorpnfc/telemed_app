@@ -52,10 +52,14 @@ class _AdherenceDashboardState extends State<AdherenceDashboard> {
     try {
       final bytes = await ReportService().downloadReportDoc();
       
+      final now = DateTime.now();
+      final timestamp = '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}_${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}';
+      final fileName = 'relatorio_medico_$timestamp.pdf';
+
       if (kIsWeb) {
         final base64 = base64Encode(bytes);
         html.AnchorElement(href: 'data:application/pdf;base64,$base64')
-          ..setAttribute('download', 'relatorio_medico.pdf')
+          ..setAttribute('download', fileName)
           ..click();
 
         if (mounted) {
@@ -68,7 +72,7 @@ class _AdherenceDashboardState extends State<AdherenceDashboard> {
         }
       } else {
         final dir = await getApplicationDocumentsDirectory();
-        final file = File('${dir.path}/relatorio_medico.pdf');
+        final file = File('${dir.path}/$fileName');
         await file.writeAsBytes(bytes);
         
         if (mounted) {
