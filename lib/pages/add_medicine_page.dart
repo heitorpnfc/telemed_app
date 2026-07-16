@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../models/medicine.dart';
 import '../services/medicine_service.dart';
+import '../models/bula.dart'; // <-- Importando o Model da Bula
+import '../services/bula_service.dart'; // <-- Importando o Service da Bula
 
 class AddMedicinePage extends StatefulWidget {
   const AddMedicinePage({super.key});
@@ -11,7 +13,12 @@ class AddMedicinePage extends StatefulWidget {
 }
 
 class _AddMedicinePageState extends State<AddMedicinePage> {
-  final _nameController = TextEditingController();
+  // Instância do serviço que busca as bulas
+  final BulaService _bulaService = BulaService();
+  
+  // O Autocomplete gerencia o próprio controller, então salvamos a referência dele aqui
+  TextEditingController? _nomeRemedioController;
+  
   final _dosageController = TextEditingController();
   final _notesController = TextEditingController();
 
@@ -21,13 +28,7 @@ class _AddMedicinePageState extends State<AddMedicinePage> {
   final List<int> _selectedDays = [];
 
   final List<String> _dayNames = [
-    'Seg',
-    'Ter',
-    'Qua',
-    'Qui',
-    'Sex',
-    'Sáb',
-    'Dom',
+    'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom',
   ];
 
   Future<void> _pickTime() async {
@@ -62,7 +63,10 @@ class _AddMedicinePageState extends State<AddMedicinePage> {
   bool _isLoading = false;
 
   Future<void> _save() async {
-    if (_nameController.text.trim().isEmpty) {
+    // Pega o texto do controller do Autocomplete
+    final nomeRemedio = _nomeRemedioController?.text.trim() ?? '';
+
+    if (nomeRemedio.isEmpty) {
       _showError('Informe o nome do remédio.');
       return;
     }
@@ -82,10 +86,9 @@ class _AddMedicinePageState extends State<AddMedicinePage> {
     });
 
     try {
-      // Cria o objeto localmente ignorando o ID falso (será descartado no toJSON)
       final medicine = Medicine(
-        id: '', 
-        name: _nameController.text.trim(),
+        id: '',
+        name: nomeRemedio, // Usando o nome buscado
         dosage: _dosageController.text.trim(),
         compartment: _selectedCompartment,
         scheduledTime: _formatTime(_selectedTime),
@@ -118,9 +121,9 @@ class _AddMedicinePageState extends State<AddMedicinePage> {
 
   @override
   void dispose() {
-    _nameController.dispose();
     _dosageController.dispose();
     _notesController.dispose();
+    // Não damos dispose no _nomeRemedioController pois o Autocomplete gerencia isso internamente
     super.dispose();
   }
 
@@ -163,13 +166,103 @@ class _AddMedicinePageState extends State<AddMedicinePage> {
             ),
             child: Column(
               children: [
-                TextField(
-                  controller: _nameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Nome do remédio',
-                    prefixIcon: Icon(Icons.medication_outlined),
-                  ),
+                
+                // --- CAMPO DE AUTOCOMPLETAR (BULÁRIO ANVISA) ---
+                Autocomplete<Bula>(
+                  displayStringForOption: (Bula option) => option.nomeProduto,
+                  optionsBuilder: (TextEditingValue textEditingValue) async {
+                    // Começa a buscar na API apenas após 3 letras digitadas para economizar dados
+                    if (textEditingValue.text.length < 3) {
+                      return const Iterable<Bula>.empty();
+                    }
+                    try {
+                      return await _bulaService.pesquisarMedicamento(textEditingValue.text);
+                    } catch (e) {
+                      print('ERRO AO BUSCAR BULA: $e');
+                      return const Iterable<Bula>.empty();
+                    }
+                  },
+                  onSelected: (Bula selecao) {
+                    // Quando escolhe o remédio, preenchemos o campo de observações com a bula!
+                    setState(() {
+                      String infoExtra = 'Fabricante: ${selecao.razaoSocial}';
+                      
+                      if (selecao.idBulaPacienteProtegido != null) {
+                        final linkBula = _bulaService.obterUrlPdf(selecao.idBulaPacienteProtegido!);
+                        infoExtra += '\nBula: $linkBula';
+                      }
+
+                      // Concatena com o que já estiver escrito nas observações
+                      if (_notesController.text.isEmpty) {
+                        _notesController.text = infoExtra;
+                      } else {
+                        _notesController.text = '${_notesController.text}\n\n$infoExtra';
+                      }
+                    });
+
+                    // Mostra um aviso verde de sucesso
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('${selecao.nomeProduto} importado!'),
+                        backgroundColor: Colors.green,
+                        duration: const Duration(seconds: 2),
+                      ),
+                    );
+                  },
+                  fieldViewBuilder: (context, textEditingController, focusNode, onFieldSubmitted) {
+                    // Guarda o controller criado pelo Autocomplete para usarmos no _save()
+                    _nomeRemedioController = textEditingController;
+
+                    return TextField(
+                      controller: textEditingController,
+                      focusNode: focusNode,
+                      decoration: const InputDecoration(
+                        labelText: 'Nome do remédio',
+                        hintText: 'Digite para buscar na ANVISA...',
+                        prefixIcon: Icon(Icons.medication_outlined),
+                      ),
+                    );
+                  },
+                  optionsViewBuilder: (context, onSelected, options) {
+                    // O design da caixinha de sugestões flutuante
+                    return Align(
+                      alignment: Alignment.topLeft,
+                      child: Material(
+                        elevation: 4.0,
+                        borderRadius: BorderRadius.circular(12),
+                        child: SizedBox(
+                          // Ajusta a largura da lista para encaixar no seu layout
+                          width: MediaQuery.of(context).size.width - 68, 
+                          height: 250,
+                          child: ListView.separated(
+                            padding: EdgeInsets.zero,
+                            itemCount: options.length,
+                            separatorBuilder: (context, index) => const Divider(height: 1),
+                            itemBuilder: (BuildContext context, int index) {
+                              final Bula option = options.elementAt(index);
+                              return ListTile(
+                                leading: const Icon(Icons.search, color: Color(0xFF0A6CFF)),
+                                title: Text(
+                                  option.nomeProduto, 
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                ),
+                                subtitle: Text(
+                                  option.razaoSocial,
+                                  style: const TextStyle(fontSize: 12),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                onTap: () => onSelected(option),
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                    );
+                  },
                 ),
+                // ------------------------------------------------
+                
                 const SizedBox(height: 14),
                 TextField(
                   controller: _dosageController,

@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../models/day_status.dart';
 import '../models/medicine.dart';
 import '../services/auth_service.dart';
 import '../services/medicine_service.dart';
-import '../widgets/week_status_bar.dart';
 import 'add_medicine_page.dart';
 import 'box_page.dart';
 import 'login_page.dart';
