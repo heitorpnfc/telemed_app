@@ -178,7 +178,6 @@ class _AddMedicinePageState extends State<AddMedicinePage> {
                     try {
                       return await _bulaService.pesquisarMedicamento(textEditingValue.text);
                     } catch (e) {
-                      print('ERRO AO BUSCAR BULA: $e');
                       return const Iterable<Bula>.empty();
                     }
                   },
