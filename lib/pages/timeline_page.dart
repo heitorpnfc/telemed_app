@@ -26,10 +26,10 @@ class _TimelinePageState extends State<TimelinePage> {
     try {
       final futures = await Future.wait([
         MedicineService().getMedicines(),
-        MedicineService().getMedicineLogs(),
+        MedicineService().getTodayLogs(),
       ]);
-      final List<dynamic> medicines = futures[0];
-      final List<dynamic> logs = futures[1];
+      final List<dynamic> medicines = futures[0] as List<dynamic>;
+      final List<dynamic> logs = futures[1] as List<dynamic>;
 
       final Map<String, String> namesMap = {};
       for (var med in medicines) {
@@ -247,12 +247,10 @@ class _TimelinePageState extends State<TimelinePage> {
                   itemCount: _logs.length,
                   itemBuilder: (context, index) {
                     final log = _logs[index];
-                    final String medId = log['medicine_id'] ?? '';
-                    final String medName = _medicineNames[medId] ?? log['medicine_name'] ?? 'Remédio Desconhecido';
-                    final String time = log['opened_at'] != null 
-                        ? DateTime.tryParse(log['opened_at'])?.toLocal().toString().split(' ')[1].substring(0, 5) ?? '--:--'
-                        : '--:--';
-                    final String situation = log['situation'] ?? 'unknown';
+                    final String medId = log.medicineId;
+                    final String medName = _medicineNames[medId] ?? 'Remédio Desconhecido';
+                    final String time = "${log.openedAt.hour.toString().padLeft(2, '0')}:${log.openedAt.minute.toString().padLeft(2, '0')}";
+                    final String situation = log.situation;
 
                     return Card(
                       margin: const EdgeInsets.only(bottom: 12),

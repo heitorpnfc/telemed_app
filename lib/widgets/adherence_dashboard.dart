@@ -6,6 +6,7 @@ import 'dart:io';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:universal_html/html.dart' as html;
+import 'package:open_filex/open_filex.dart';
 
 class AdherenceDashboard extends StatefulWidget {
   const AdherenceDashboard({super.key});
@@ -83,10 +84,8 @@ class _AdherenceDashboardState extends State<AdherenceDashboard> {
               action: SnackBarAction(
                 label: 'Abrir',
                 textColor: Colors.white,
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Salvo em: ${file.path}')),
-                  );
+                onPressed: () async {
+                  await OpenFilex.open(file.path);
                 },
               ),
             ),
