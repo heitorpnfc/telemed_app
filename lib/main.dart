@@ -1,11 +1,43 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 import 'pages/login_page.dart';
 
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+
 import 'services/notification_service.dart';
+
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  if (!kIsWeb) {
+    await Firebase.initializeApp();
+  }
+  print("Handling a background message: ${message.messageId}");
+}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  if (!kIsWeb) {
+    try {
+      await Firebase.initializeApp();
+      FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+      
+      // Solicita permissão no iOS/Android 13+
+      await FirebaseMessaging.instance.requestPermission();
+      
+      FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+        print('Got a message whilst in the foreground!');
+        if (message.notification != null) {
+          print('Message also contained a notification: ${message.notification}');
+        }
+      });
+    } catch (e) {
+      print('Erro ao inicializar Firebase: $e');
+    }
+  }
+
   await NotificationService().init();
   runApp(const TelemedApp());
 }

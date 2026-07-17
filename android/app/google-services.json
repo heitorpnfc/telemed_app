@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "339381365708",
+    "project_id": "remindcare-1efbd",
+    "storage_bucket": "remindcare-1efbd.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:339381365708:android:42199b79baa5973d938b69",
+        "android_client_info": {
+          "package_name": "com.example.telemed_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAxHE3pSn8WfHlfebFRuTPkvhGLGGIN0NY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
