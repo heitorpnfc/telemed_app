@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/day_status.dart';
 import '../models/medicine.dart';
+import '../models/medicine_log.dart';
 import '../services/auth_service.dart';
 import '../services/medicine_service.dart';
 import '../widgets/adherence_dashboard.dart';
@@ -13,7 +14,9 @@ import 'box_page.dart';
 import 'login_page.dart';
 import 'profile_page.dart';
 import 'weekly_page.dart';
+import '../services/device_service.dart';
 import '../services/notification_service.dart';
+import '../services/user_service.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -24,8 +27,11 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   List<Medicine> _medicines = [];
+  List<MedicineLog> _todayLogs = [];
+  Map<String, dynamic>? _pairedDevice;
   bool _isLoading = true;
   int _dashboardKey = 0;
+  String _userName = 'usuário';
 
   @override
   void initState() {
@@ -35,10 +41,24 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _loadData() async {
     try {
-      final medicines = await MedicineService().getMedicines();
+      final futures = await Future.wait([
+        MedicineService().getMedicines(),
+        MedicineService().getTodayLogs(),
+        UserService().getMyProfile(),
+        DeviceService().getPairedDevice(),
+      ]);
+      
+      final medicines = futures[0] as List<Medicine>;
+      final logs = futures[1] as List<MedicineLog>;
+      final profile = futures[2] as Map<String, dynamic>;
+      final pairedDevice = futures[3] as Map<String, dynamic>?;
+
       if (mounted) {
         setState(() {
           _medicines = medicines;
+          _todayLogs = logs;
+          _userName = profile['name']?.split(' ')[0] ?? 'usuário';
+          _pairedDevice = pairedDevice;
           _isLoading = false;
         });
         NotificationService().scheduleMedicineAlarms(medicines);
@@ -141,9 +161,10 @@ class _HomePageState extends State<HomePage> {
   ];
   */
 
+  // Método mantido para manter compatibilidade, embora usemos a timeline agora
   Medicine? get _nextMedicine {
     final now = DateTime.now();
-    final today = now.weekday;
+    final today = now.weekday; // 1 = Seg, 7 = Dom
     final currentTimeString =
         '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
 
@@ -153,19 +174,43 @@ class _HomePageState extends State<HomePage> {
 
     todayMedicines.sort((a, b) => a.scheduledTime.compareTo(b.scheduledTime));
 
-    // Pega o primeiro remédio cujo horário é maior que o horário atual
     final upcoming = todayMedicines
         .where((m) => m.scheduledTime.compareTo(currentTimeString) > 0)
         .toList();
 
-    if (upcoming.isNotEmpty) {
-      return upcoming.first;
+    if (upcoming.isNotEmpty) return upcoming.first;
+    if (todayMedicines.isNotEmpty) return todayMedicines.first;
+    return null;
+  }
+
+  List<Medicine> get _todayMedicines {
+    final now = DateTime.now();
+    final today = now.weekday;
+    final list = _medicines.where((m) => m.weekDays.contains(today)).toList();
+    list.sort((a, b) => a.scheduledTime.compareTo(b.scheduledTime));
+    return list;
+  }
+
+  String _calculateLiveStatus(Medicine medicine) {
+    // FONTE ÚNICA DA VERDADE: Se a caixa (via DB) mandou um status, confiamos cegamente nela.
+    final log = _todayLogs.where((l) => l.medicineId == medicine.id).lastOrNull;
+    if (log != null) {
+      return log.situation; // 'onTime', 'warning', 'late', 'early', 'missed'
     }
 
-    // Se todos de hoje já passaram, retorna o primeiro do dia (que será o da próxima semana)
-    if (todayMedicines.isNotEmpty) return todayMedicines.first;
+    // Se não há log da caixa, o padrão é 'Pendente' (esperando a caixa agir)
+    final now = DateTime.now();
+    final parts = medicine.scheduledTime.split(':');
+    final schedTime = DateTime(now.year, now.month, now.day, int.parse(parts[0]), int.parse(parts[1]));
+    
+    final diffMins = now.difference(schedTime).inMinutes;
 
-    return null;
+    // Apenas um "fallback de segurança": se já passou 1 hora e a caixa falhou 
+    // catastroficamente em mandar o evento 'missed' por queda de internet, assumimos Missed.
+    if (diffMins > 60) return 'missed';
+
+    // Para todo o resto, aguardamos a caixa tomar a decisão.
+    return 'pending';
   }
 
   Future<void> _addMedicine() async {
@@ -236,19 +281,19 @@ class _HomePageState extends State<HomePage> {
             ),
           ),
           const SizedBox(width: 16),
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Olá, usuário 👋',
-                  style: TextStyle(
+                  'Olá, $_userName 👋',
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 15,
                   ),
                 ),
-                SizedBox(height: 5),
-                Text(
+                const SizedBox(height: 5),
+                const Text(
                   'Seu cuidado está em dia?',
                   style: TextStyle(
                     color: Colors.white,
@@ -264,8 +309,8 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildNextMedicineCard() {
-    final nextMedicine = _nextMedicine;
+  Widget _buildTodayTimeline() {
+    final todayMeds = _todayMedicines;
 
     return Container(
       width: double.infinity,
@@ -277,87 +322,122 @@ class _HomePageState extends State<HomePage> {
           color: const Color(0xFFE5E7EB),
         ),
       ),
-      child: nextMedicine == null
-          ? const Row(
-              children: [
-                CircleAvatar(
-                  radius: 28,
-                  backgroundColor: Color(0xFFEFF6FF),
-                  child: Icon(
-                    Icons.medication_outlined,
-                    color: Color(0xFF0A6CFF),
-                  ),
-                ),
-                SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Próximo remédio',
-                        style: TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      SizedBox(height: 4),
-                      Text(
-                        'Nenhum remédio cadastrado para hoje.',
-                        style: TextStyle(
-                          color: Color(0xFF6B7280),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            )
-          : Row(
-              children: [
-                CircleAvatar(
-                  radius: 30,
-                  backgroundColor: const Color(0xFFEFF6FF),
-                  child: Text(
-                    '${nextMedicine.compartment}',
-                    style: const TextStyle(
-                      color: Color(0xFF0A6CFF),
-                      fontWeight: FontWeight.bold,
-                      fontSize: 20,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Próximo remédio',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: Color(0xFF6B7280),
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        nextMedicine.name,
-                        style: const TextStyle(
-                          fontSize: 21,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '${nextMedicine.dosage} • ${nextMedicine.scheduledTime} • Compartimento ${nextMedicine.compartment}',
-                        style: const TextStyle(
-                          color: Color(0xFF6B7280),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Remédios de Hoje',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF111827),
             ),
+          ),
+          const SizedBox(height: 16),
+          if (todayMeds.isEmpty)
+            const Text(
+              'Nenhum remédio agendado para hoje.',
+              style: TextStyle(color: Color(0xFF6B7280)),
+            )
+          else
+            ...todayMeds.map((med) {
+              final status = _calculateLiveStatus(med);
+              
+              Color iconColor;
+              Color bgColor;
+              IconData iconData;
+              String statusText;
+
+              switch (status) {
+                case 'onTime':
+                  iconColor = const Color(0xFF22C55E);
+                  bgColor = const Color(0xFFDCFCE7);
+                  iconData = Icons.check_circle;
+                  statusText = 'Tomado no Horário';
+                  break;
+                case 'warning':
+                  iconColor = const Color(0xFFF59E0B);
+                  bgColor = const Color(0xFFFEF3C7);
+                  iconData = Icons.warning_rounded;
+                  statusText = 'Atrasado';
+                  break;
+                case 'late':
+                  iconColor = const Color(0xFFEA580C);
+                  bgColor = const Color(0xFFFFEDD5);
+                  iconData = Icons.schedule_outlined;
+                  statusText = 'Muito Atrasado';
+                  break;
+                case 'missed':
+                case 'missed_live':
+                  iconColor = const Color(0xFFEF4444);
+                  bgColor = const Color(0xFFFEE2E2);
+                  iconData = Icons.cancel;
+                  statusText = 'Esquecido';
+                  break;
+                case 'take_now':
+                  iconColor = const Color(0xFF0A6CFF);
+                  bgColor = const Color(0xFFEFF6FF);
+                  iconData = Icons.notifications_active;
+                  statusText = 'Hora de Tomar!';
+                  break;
+                case 'early':
+                  iconColor = const Color(0xFF8B5CF6);
+                  bgColor = const Color(0xFFEDE9FE);
+                  iconData = Icons.timer_outlined;
+                  statusText = 'Adiantado';
+                  break;
+                default: // pending
+                  iconColor = const Color(0xFF9CA3AF);
+                  bgColor = const Color(0xFFF3F4F6);
+                  iconData = Icons.access_time_filled;
+                  statusText = 'Pendente';
+              }
+
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12.0),
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 22,
+                      backgroundColor: bgColor,
+                      child: Icon(iconData, color: iconColor, size: 22),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            med.name,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                          Text(
+                            '${med.scheduledTime} • Gaveta ${med.compartment}',
+                            style: const TextStyle(
+                              color: Color(0xFF6B7280),
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Text(
+                      statusText,
+                      style: TextStyle(
+                        color: iconColor,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }).toList(),
+        ],
+      ),
     );
   }
 
@@ -591,7 +671,7 @@ class _HomePageState extends State<HomePage> {
           const SizedBox(height: 14),
           AdherenceDashboard(key: ValueKey(_dashboardKey)),
           const SizedBox(height: 24),
-          _buildNextMedicineCard(),
+          _buildTodayTimeline(),
           const SizedBox(height: 22),
           _buildActionButton(
             icon: Icons.medication_outlined,
@@ -648,17 +728,43 @@ class _HomePageState extends State<HomePage> {
             },
           ),
           const SizedBox(height: 10),
-          _buildActionButton(
-            icon: Icons.qr_code_scanner,
-            title: 'Parear Caixinha',
-            subtitle: 'Conecte sua caixa IoT ao seu perfil.',
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const DeviceBindPage()),
+          Builder(builder: (context) {
+            if (_pairedDevice != null) {
+              final deviceId = _pairedDevice!['id'];
+              final lastHb = _pairedDevice!['last_heartbeat_at'];
+              bool isOnline = false;
+              if (lastHb != null) {
+                final hbDate = DateTime.parse(lastHb).toLocal();
+                if (DateTime.now().difference(hbDate).inMinutes < 35) {
+                  isOnline = true;
+                }
+              }
+              
+              return _buildActionButton(
+                icon: Icons.qr_code_scanner,
+                title: 'Caixa $deviceId',
+                subtitle: isOnline ? '🟢 Online (Pareada)' : '🔴 Offline (Verifique Wi-Fi/Bateria)',
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const DeviceBindPage()),
+                  );
+                },
               );
-            },
-          ),
+            } else {
+              return _buildActionButton(
+                icon: Icons.qr_code_scanner,
+                title: 'Parear Caixinha',
+                subtitle: 'Conecte sua caixa IoT ao seu perfil.',
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const DeviceBindPage()),
+                  );
+                },
+              );
+            }
+          }),
           const SizedBox(height: 26),
           const Text(
             'Remédios cadastrados',

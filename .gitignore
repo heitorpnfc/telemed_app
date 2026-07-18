@@ -65,3 +65,4 @@ android/build_error.txt
 **/ios/Pods/
 **/ios/.symlinks/
 **/ios/.macos/
+android/app/google-services.json

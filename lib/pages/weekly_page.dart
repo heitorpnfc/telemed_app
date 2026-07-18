@@ -47,7 +47,6 @@ class WeeklyPage extends StatelessWidget {
             padding: const EdgeInsets.only(bottom: 12),
             child: Material(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(24),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(24),
                 side: const BorderSide(

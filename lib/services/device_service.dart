@@ -15,6 +15,21 @@ class DeviceService {
     }
   }
 
+  Future<Map<String, dynamic>?> getPairedDevice() async {
+    try {
+      final response = await _dio.get('/api/v1/devices/me');
+      if (response.statusCode == 200) {
+        return response.data as Map<String, dynamic>;
+      }
+      return null;
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 404) {
+        return null;
+      }
+      return null;
+    }
+  }
+
   String _getErrorMessage(DioException e) {
     final data = e.response?.data;
     if (data is Map && data['error'] != null) {

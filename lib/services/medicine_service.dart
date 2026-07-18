@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import '../models/medicine.dart';
+import '../models/medicine_log.dart';
 import 'api_client.dart';
 
 class MedicineService {
@@ -62,11 +63,13 @@ class MedicineService {
     }
   }
 
-  Future<List<dynamic>> getMedicineLogs() async {
+  Future<List<MedicineLog>> getTodayLogs() async {
     try {
       final response = await _dio.get('/medicines/logs');
       if (response.data is List) {
-        return response.data as List<dynamic>;
+        return (response.data as List)
+            .map((json) => MedicineLog.fromJson(json))
+            .toList();
       }
       return [];
     } on DioException catch (e) {

@@ -26,6 +26,7 @@ class MedicineStat {
   final String scheduledTime;
   final List<int> weekDays;
   final int onTimeCount;
+  final int earlyCount;
   final int lateCount;
   final int warningCount;
 
@@ -37,6 +38,7 @@ class MedicineStat {
     required this.scheduledTime,
     required this.weekDays,
     required this.onTimeCount,
+    required this.earlyCount,
     required this.lateCount,
     required this.warningCount,
   });
@@ -50,6 +52,7 @@ class MedicineStat {
       scheduledTime: json['scheduled_time'] as String,
       weekDays: List<int>.from(json['week_days'] ?? []),
       onTimeCount: int.tryParse(json['on_time_count'].toString()) ?? 0,
+      earlyCount: int.tryParse(json['early_count'].toString()) ?? 0,
       lateCount: int.tryParse(json['late_count'].toString()) ?? 0,
       warningCount: int.tryParse(json['warning_count'].toString()) ?? 0,
     );
