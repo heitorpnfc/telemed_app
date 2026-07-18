@@ -735,7 +735,7 @@ class _HomePageState extends State<HomePage> {
               bool isOnline = false;
               if (lastHb != null) {
                 final hbDate = DateTime.parse(lastHb).toLocal();
-                if (DateTime.now().difference(hbDate).inMinutes < 35) {
+                if (DateTime.now().difference(hbDate).inMinutes < 15) {
                   isOnline = true;
                 }
               }
