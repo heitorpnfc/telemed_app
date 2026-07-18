@@ -14,6 +14,7 @@ import 'box_page.dart';
 import 'login_page.dart';
 import 'profile_page.dart';
 import 'weekly_page.dart';
+import '../services/device_service.dart';
 import '../services/notification_service.dart';
 import '../services/user_service.dart';
 
@@ -27,6 +28,7 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   List<Medicine> _medicines = [];
   List<MedicineLog> _todayLogs = [];
+  Map<String, dynamic>? _pairedDevice;
   bool _isLoading = true;
   int _dashboardKey = 0;
   String _userName = 'usuário';
@@ -43,17 +45,20 @@ class _HomePageState extends State<HomePage> {
         MedicineService().getMedicines(),
         MedicineService().getTodayLogs(),
         UserService().getMyProfile(),
+        DeviceService().getPairedDevice(),
       ]);
       
       final medicines = futures[0] as List<Medicine>;
       final logs = futures[1] as List<MedicineLog>;
       final profile = futures[2] as Map<String, dynamic>;
+      final pairedDevice = futures[3] as Map<String, dynamic>?;
 
       if (mounted) {
         setState(() {
           _medicines = medicines;
           _todayLogs = logs;
           _userName = profile['name']?.split(' ')[0] ?? 'usuário';
+          _pairedDevice = pairedDevice;
           _isLoading = false;
         });
         NotificationService().scheduleMedicineAlarms(medicines);
@@ -723,17 +728,43 @@ class _HomePageState extends State<HomePage> {
             },
           ),
           const SizedBox(height: 10),
-          _buildActionButton(
-            icon: Icons.qr_code_scanner,
-            title: 'Parear Caixinha',
-            subtitle: 'Conecte sua caixa IoT ao seu perfil.',
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const DeviceBindPage()),
+          Builder(builder: (context) {
+            if (_pairedDevice != null) {
+              final deviceId = _pairedDevice!['id'];
+              final lastHb = _pairedDevice!['last_heartbeat_at'];
+              bool isOnline = false;
+              if (lastHb != null) {
+                final hbDate = DateTime.parse(lastHb).toLocal();
+                if (DateTime.now().difference(hbDate).inMinutes < 35) {
+                  isOnline = true;
+                }
+              }
+              
+              return _buildActionButton(
+                icon: Icons.qr_code_scanner,
+                title: 'Caixa $deviceId',
+                subtitle: isOnline ? '🟢 Online (Pareada)' : '🔴 Offline (Verifique Wi-Fi/Bateria)',
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const DeviceBindPage()),
+                  );
+                },
               );
-            },
-          ),
+            } else {
+              return _buildActionButton(
+                icon: Icons.qr_code_scanner,
+                title: 'Parear Caixinha',
+                subtitle: 'Conecte sua caixa IoT ao seu perfil.',
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const DeviceBindPage()),
+                  );
+                },
+              );
+            }
+          }),
           const SizedBox(height: 26),
           const Text(
             'Remédios cadastrados',
