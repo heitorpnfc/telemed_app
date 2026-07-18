@@ -72,7 +72,16 @@ class _AdherenceDashboardState extends State<AdherenceDashboard> {
           );
         }
       } else {
-        final dir = await getApplicationDocumentsDirectory();
+        Directory dir;
+        if (Platform.isAndroid) {
+          dir = Directory('/storage/emulated/0/Download');
+          if (!await dir.exists()) {
+            dir = await getApplicationDocumentsDirectory();
+          }
+        } else {
+          dir = await getApplicationDocumentsDirectory();
+        }
+        
         final file = File('${dir.path}/$fileName');
         await file.writeAsBytes(bytes);
         
@@ -134,16 +143,18 @@ class _AdherenceDashboardState extends State<AdherenceDashboard> {
     if (_stats == null) return const SizedBox.shrink();
 
     int totalOnTime = 0;
+    int totalEarly = 0;
     int totalLate = 0;
     int totalWarning = 0;
 
     for (var stat in _stats!.stats) {
       totalOnTime += stat.onTimeCount;
+      totalEarly += stat.earlyCount;
       totalLate += stat.lateCount;
       totalWarning += stat.warningCount;
     }
 
-    final totalDoses = totalOnTime + totalLate + totalWarning;
+    final totalDoses = totalOnTime + totalLate + totalWarning + totalEarly;
     final double adherenceRate = totalDoses == 0 ? 0 : (totalOnTime / totalDoses) * 100;
 
     return Container(
@@ -226,6 +237,8 @@ class _AdherenceDashboardState extends State<AdherenceDashboard> {
                 child: Column(
                   children: [
                     _buildStatRow('No horário', totalOnTime, const Color(0xFF22C55E)),
+                    const SizedBox(height: 8),
+                    _buildStatRow('Adiantado', totalEarly, const Color(0xFF8B5CF6)),
                     const SizedBox(height: 8),
                     _buildStatRow('Atrasado', totalWarning, const Color(0xFFF59E0B)),
                     const SizedBox(height: 8),
