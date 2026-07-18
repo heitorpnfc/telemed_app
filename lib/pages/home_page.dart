@@ -15,6 +15,7 @@ import 'login_page.dart';
 import 'profile_page.dart';
 import 'weekly_page.dart';
 import '../services/notification_service.dart';
+import '../services/user_service.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -28,6 +29,7 @@ class _HomePageState extends State<HomePage> {
   List<MedicineLog> _todayLogs = [];
   bool _isLoading = true;
   int _dashboardKey = 0;
+  String _userName = 'usuário';
 
   @override
   void initState() {
@@ -40,15 +42,18 @@ class _HomePageState extends State<HomePage> {
       final futures = await Future.wait([
         MedicineService().getMedicines(),
         MedicineService().getTodayLogs(),
+        UserService().getMyProfile(),
       ]);
       
       final medicines = futures[0] as List<Medicine>;
       final logs = futures[1] as List<MedicineLog>;
+      final profile = futures[2] as Map<String, dynamic>;
 
       if (mounted) {
         setState(() {
           _medicines = medicines;
           _todayLogs = logs;
+          _userName = profile['name']?.split(' ')[0] ?? 'usuário';
           _isLoading = false;
         });
         NotificationService().scheduleMedicineAlarms(medicines);
@@ -271,19 +276,19 @@ class _HomePageState extends State<HomePage> {
             ),
           ),
           const SizedBox(width: 16),
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Olá, usuário 👋',
-                  style: TextStyle(
+                  'Olá, $_userName 👋',
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 15,
                   ),
                 ),
-                SizedBox(height: 5),
-                Text(
+                const SizedBox(height: 5),
+                const Text(
                   'Seu cuidado está em dia?',
                   style: TextStyle(
                     color: Colors.white,
@@ -369,6 +374,12 @@ class _HomePageState extends State<HomePage> {
                   bgColor = const Color(0xFFEFF6FF);
                   iconData = Icons.notifications_active;
                   statusText = 'Hora de Tomar!';
+                  break;
+                case 'early':
+                  iconColor = const Color(0xFF8B5CF6);
+                  bgColor = const Color(0xFFEDE9FE);
+                  iconData = Icons.timer_outlined;
+                  statusText = 'Adiantado';
                   break;
                 default: // pending
                   iconColor = const Color(0xFF9CA3AF);
