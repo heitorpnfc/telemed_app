@@ -19,6 +19,8 @@ dependencies:
   open_filex: ^4.7.0
   firebase_core: ^4.12.1
   firebase_messaging: ^16.4.3
+  mobile_scanner: ^7.4.0
+  alarm: ^5.5.0
 
 dev_dependencies:
   flutter_test:
@@ -31,6 +33,7 @@ flutter:
   uses-material-design: true
 
   assets:
+    - assets/audio/remindcare_alarm.mp3
     - assets/images/remindcare_logo.png
     - assets/bulario_brasil.json
 

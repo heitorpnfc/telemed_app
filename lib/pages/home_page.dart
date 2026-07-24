@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-
+import '../services/medicine_alarm_service.dart';
 import '../models/day_status.dart';
 import '../models/medicine.dart';
 import '../models/medicine_log.dart';
@@ -15,7 +15,6 @@ import 'login_page.dart';
 import 'profile_page.dart';
 import 'weekly_page.dart';
 import '../services/device_service.dart';
-import '../services/notification_service.dart';
 import '../services/user_service.dart';
 
 class HomePage extends StatefulWidget {
@@ -61,7 +60,10 @@ class _HomePageState extends State<HomePage> {
           _pairedDevice = pairedDevice;
           _isLoading = false;
         });
-        NotificationService().scheduleMedicineAlarms(medicines);
+
+        await MedicineAlarmService.syncMedicineAlarms(
+            medicines,
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -226,11 +228,14 @@ class _HomePageState extends State<HomePage> {
         _medicines.add(result);
         _dashboardKey++;
       });
-      NotificationService().scheduleMedicineAlarms(_medicines);
+      await MedicineAlarmService.syncMedicineAlarms(
+        _medicines,
+      );
     }
   }
 
   Future<void> _logout() async {
+    await MedicineAlarmService.cancelMedicineAlarms();
     await AuthService().logout();
 
     if (!mounted) return;

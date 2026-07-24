@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
-
+import 'pages/session_gate.dart';
 import 'pages/login_page.dart';
+
+import 'package:alarm/alarm.dart';
+import 'services/medicine_alarm_service.dart';
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -18,27 +21,39 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   if (!kIsWeb) {
     try {
+      // Inicializa o sistema de alarmes.
+      await Alarm.init();
+      
       await Firebase.initializeApp();
-      FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-      
-      // Solicita permissão no iOS/Android 13+
+
+      FirebaseMessaging.onBackgroundMessage(
+        _firebaseMessagingBackgroundHandler,
+      );
+
       await FirebaseMessaging.instance.requestPermission();
-      
-      FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-        print('Got a message whilst in the foreground!');
-        if (message.notification != null) {
-          print('Message also contained a notification: ${message.notification}');
-        }
-      });
+
+      FirebaseMessaging.onMessage.listen(
+        (RemoteMessage message) {
+          print('Mensagem recebida com o aplicativo aberto.');
+
+          if (message.notification != null) {
+            print(
+              'A mensagem contém uma notificação: '
+              '${message.notification}',
+            );
+          }
+        },
+      );
     } catch (e) {
-      print('Erro ao inicializar Firebase: $e');
+      print('Erro ao inicializar serviços: $e');
     }
   }
 
   await NotificationService().init();
+
   runApp(const TelemedApp());
 }
 
@@ -136,7 +151,7 @@ class TelemedApp extends StatelessWidget {
           ),
         ),
       ),
-      home: const LoginPage(),
+      home: const SessionGate(),
     );
   }
 }
