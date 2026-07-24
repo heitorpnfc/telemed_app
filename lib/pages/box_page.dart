@@ -10,14 +10,22 @@ class BoxPage extends StatelessWidget {
     required this.medicines,
   });
 
+  // Relação definida para a caixa física:
+  // 1 = Domingo
+  // 2 = Segunda-feira
+  // 3 = Terça-feira
+  // 4 = Quarta-feira
+  // 5 = Quinta-feira
+  // 6 = Sexta-feira
+  // 7 = Sábado
   static const List<String> _weekDays = [
+    'Domingo',
     'Segunda-feira',
     'Terça-feira',
     'Quarta-feira',
     'Quinta-feira',
     'Sexta-feira',
     'Sábado',
-    'Domingo',
   ];
 
   List<Medicine> _medicinesForCompartment(int compartment) {
@@ -93,7 +101,7 @@ class _CompartmentCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bool isEmpty = medicines.isEmpty;
+    final isEmpty = medicines.isEmpty;
 
     return Container(
       width: double.infinity,
@@ -139,17 +147,18 @@ class _CompartmentCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // O dia agora é a informação principal.
                     Text(
-                      'Compartimento $compartment',
+                      weekDay,
                       style: const TextStyle(
                         color: Color(0xFF111827),
-                        fontSize: 18,
+                        fontSize: 19,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      weekDay,
+                      'Compartimento $compartment',
                       style: const TextStyle(
                         color: Color(0xFF0A6CFF),
                         fontSize: 15,
@@ -160,6 +169,11 @@ class _CompartmentCard extends StatelessWidget {
                 ),
               ),
               Container(
+                constraints: const BoxConstraints(
+                  minWidth: 44,
+                  minHeight: 44,
+                ),
+                alignment: Alignment.center,
                 padding: const EdgeInsets.symmetric(
                   horizontal: 12,
                   vertical: 8,
@@ -168,7 +182,7 @@ class _CompartmentCard extends StatelessWidget {
                   color: isEmpty
                       ? const Color(0xFFF3F4F6)
                       : const Color(0xFFECFDF5),
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(22),
                 ),
                 child: Text(
                   medicines.length.toString(),
@@ -183,9 +197,7 @@ class _CompartmentCard extends StatelessWidget {
               ),
             ],
           ),
-
           const SizedBox(height: 16),
-
           Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(
@@ -209,25 +221,25 @@ class _CompartmentCard extends StatelessWidget {
                       : const Color(0xFF059669),
                 ),
                 const SizedBox(width: 10),
-                Text(
-                  quantityText,
-                  style: TextStyle(
-                    color: isEmpty
-                        ? const Color(0xFF6B7280)
-                        : const Color(0xFF047857),
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
+                Expanded(
+                  child: Text(
+                    quantityText,
+                    style: TextStyle(
+                      color: isEmpty
+                          ? const Color(0xFF6B7280)
+                          : const Color(0xFF047857),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
               ],
             ),
           ),
-
           if (medicines.isNotEmpty) ...[
             const SizedBox(height: 16),
             const Divider(height: 1),
             const SizedBox(height: 12),
-
             ...medicines.map(
               (medicine) => Padding(
                 padding: const EdgeInsets.only(bottom: 10),
@@ -249,6 +261,16 @@ class _MedicineItem extends StatelessWidget {
   const _MedicineItem({
     required this.medicine,
   });
+
+  String _formatTime(String scheduledTime) {
+    final parts = scheduledTime.split(':');
+
+    if (parts.length >= 2) {
+      return '${parts[0]}:${parts[1]}';
+    }
+
+    return scheduledTime;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -273,7 +295,7 @@ class _MedicineItem extends StatelessWidget {
               borderRadius: BorderRadius.circular(10),
             ),
             child: Text(
-              medicine.scheduledTime,
+              _formatTime(medicine.scheduledTime),
               style: const TextStyle(
                 color: Color(0xFF0A6CFF),
                 fontSize: 14,
@@ -288,7 +310,7 @@ class _MedicineItem extends StatelessWidget {
               children: [
                 Text(
                   medicine.name,
-                  maxLines: 1,
+                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     color: Color(0xFF111827),
@@ -308,10 +330,6 @@ class _MedicineItem extends StatelessWidget {
                 ),
               ],
             ),
-          ),
-          const Icon(
-            Icons.chevron_right_rounded,
-            color: Color(0xFF9CA3AF),
           ),
         ],
       ),
