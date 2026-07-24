@@ -15,6 +15,8 @@ import 'login_page.dart';
 import 'profile_page.dart';
 import 'weekly_page.dart';
 import '../services/device_service.dart';
+import '../services/update_service.dart';
+import '../services/notification_service.dart';
 import '../services/user_service.dart';
 
 class HomePage extends StatefulWidget {
@@ -36,6 +38,72 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     _loadData();
+    _checkForUpdates();
+  }
+
+  Future<void> _checkForUpdates() async {
+    final updateService = UpdateService();
+    final updateInfo = await updateService.checkForUpdate();
+    
+    if (updateInfo != null && mounted) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) {
+          bool isDownloading = false;
+          double progress = 0.0;
+          
+          return StatefulBuilder(
+            builder: (context, setDialogState) {
+              return AlertDialog(
+                title: Text("Nova Versão Disponível!"),
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text("A versão ${updateInfo.version} está disponível para download."),
+                    const SizedBox(height: 10),
+                    Text("O que há de novo:", style: TextStyle(fontWeight: FontWeight.bold)),
+                    Text(updateInfo.releaseNotes),
+                    if (isDownloading) ...[
+                      const SizedBox(height: 20),
+                      LinearProgressIndicator(value: progress),
+                      const SizedBox(height: 10),
+                      Text("Baixando: ${(progress * 100).toStringAsFixed(0)}%"),
+                    ],
+                  ],
+                ),
+                actions: [
+                  if (!isDownloading)
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: Text("Depois"),
+                    ),
+                  if (!isDownloading)
+                    ElevatedButton(
+                      onPressed: () async {
+                        setDialogState(() {
+                          isDownloading = true;
+                        });
+                        await updateService.downloadAndInstallUpdate(
+                          updateInfo.url,
+                          (p) {
+                            setDialogState(() {
+                              progress = p;
+                            });
+                          },
+                        );
+                        // Navigator.pop(context); // Optional to close after download
+                      },
+                      child: Text("Atualizar Agora"),
+                    ),
+                ],
+              );
+            }
+          );
+        },
+      );
+    }
   }
 
   Future<void> _loadData() async {
