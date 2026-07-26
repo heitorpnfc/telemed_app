@@ -38,49 +38,49 @@ class _AddMedicinePageState extends State<AddMedicinePage> {
   bool _isLoading = false;
 
   // Dia selecionado pelo usuário.
-  int _selectedWeekday = DateTime.sunday;
+  int _selectedWeekday = DateTime.monday;
 
   // Ordem apresentada no seletor.
   static const List<int> _weekdayOrder = [
-    DateTime.sunday,
     DateTime.monday,
     DateTime.tuesday,
     DateTime.wednesday,
     DateTime.thursday,
     DateTime.friday,
     DateTime.saturday,
+    DateTime.sunday,
   ];
 
   static const Map<int, String> _weekdayNames = {
-    DateTime.sunday: 'Domingo',
     DateTime.monday: 'Segunda-feira',
     DateTime.tuesday: 'Terça-feira',
     DateTime.wednesday: 'Quarta-feira',
     DateTime.thursday: 'Quinta-feira',
     DateTime.friday: 'Sexta-feira',
     DateTime.saturday: 'Sábado',
+    DateTime.sunday: 'Domingo',
   };
 
   // Cada dia representa automaticamente um compartimento.
   static const Map<int, int> _weekdayToCompartment = {
-    DateTime.sunday: 1,
-    DateTime.monday: 2,
-    DateTime.tuesday: 3,
-    DateTime.wednesday: 4,
-    DateTime.thursday: 5,
-    DateTime.friday: 6,
-    DateTime.saturday: 7,
+    DateTime.monday: 1,
+    DateTime.tuesday: 2,
+    DateTime.wednesday: 3,
+    DateTime.thursday: 4,
+    DateTime.friday: 5,
+    DateTime.saturday: 6,
+    DateTime.sunday: 7,
   };
 
   // Usado para recuperar o dia ao editar medicamentos antigos.
   static const Map<int, int> _compartmentToWeekday = {
-    1: DateTime.sunday,
-    2: DateTime.monday,
-    3: DateTime.tuesday,
-    4: DateTime.wednesday,
-    5: DateTime.thursday,
-    6: DateTime.friday,
-    7: DateTime.saturday,
+    1: DateTime.monday,
+    2: DateTime.tuesday,
+    3: DateTime.wednesday,
+    4: DateTime.thursday,
+    5: DateTime.friday,
+    6: DateTime.saturday,
+    7: DateTime.sunday,
   };
 
   int get _selectedCompartment =>

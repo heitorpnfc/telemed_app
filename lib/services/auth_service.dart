@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -98,13 +99,60 @@ class AuthService {
     final refreshToken =
         await _storage.read(key: 'refresh_token');
 
-    final hasAccessToken =
-        accessToken != null && accessToken.isNotEmpty;
+    // Se tiver um access_token válido e não expirado, está logado.
+    if (accessToken != null && accessToken.isNotEmpty) {
+      if (!_isTokenExpired(accessToken)) {
+        return true;
+      }
+    }
 
-    final hasRefreshToken =
-        refreshToken != null && refreshToken.isNotEmpty;
+    // Se o access_token expirou mas ainda tem refresh_token,
+    // considera logado (o ApiClient fará o refresh automaticamente).
+    if (refreshToken != null && refreshToken.isNotEmpty) {
+      return true;
+    }
 
-    return hasAccessToken || hasRefreshToken;
+    return false;
+  }
+
+  /// Decodifica o payload do JWT e verifica se o campo `exp`
+  /// já passou em relação ao horário atual do dispositivo.
+  bool _isTokenExpired(String token) {
+    try {
+      final parts = token.split('.');
+      if (parts.length != 3) return true;
+
+      // O payload é a segunda parte do JWT, codificada em Base64Url.
+      String payload = parts[1];
+
+      // Base64Url exige padding para múltiplo de 4.
+      switch (payload.length % 4) {
+        case 2:
+          payload += '==';
+          break;
+        case 3:
+          payload += '=';
+          break;
+      }
+
+      final decoded = utf8.decode(base64Url.decode(payload));
+      final Map<String, dynamic> data = jsonDecode(decoded);
+
+      final exp = data['exp'];
+      if (exp == null) return true;
+
+      final expDate = DateTime.fromMillisecondsSinceEpoch(
+        exp * 1000,
+      );
+
+      // Considera expirado se faltar menos de 30 segundos.
+      return DateTime.now().isAfter(
+        expDate.subtract(const Duration(seconds: 30)),
+      );
+    } catch (_) {
+      // Se não conseguir decodificar, assume expirado.
+      return true;
+    }
   }
 
   Future<String?> getAccessToken() async {
