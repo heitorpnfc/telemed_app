@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import '../services/medicine_alarm_service.dart';
 import '../models/day_status.dart';
 import '../models/medicine.dart';
@@ -34,11 +36,45 @@ class _HomePageState extends State<HomePage> {
   int _dashboardKey = 0;
   String _userName = 'usuário';
 
+  StreamSubscription<RemoteMessage>? _fcmForegroundSub;
+  StreamSubscription<RemoteMessage>? _fcmOpenedSub;
+
   @override
   void initState() {
     super.initState();
     _loadData();
     _checkForUpdates();
+    UserService().syncFcmToken();
+
+    _fcmForegroundSub = FirebaseMessaging.onMessage.listen((msg) {
+      _onBoxEvent(showToast: true);
+    });
+    _fcmOpenedSub = FirebaseMessaging.onMessageOpenedApp.listen((msg) {
+      _onBoxEvent(showToast: false);
+    });
+  }
+
+  @override
+  void dispose() {
+    _fcmForegroundSub?.cancel();
+    _fcmOpenedSub?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _onBoxEvent({required bool showToast}) async {
+    await _loadData();
+    if (!mounted) return;
+    setState(() {
+      _dashboardKey++;
+    });
+    if (showToast) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Novo evento da caixinha recebido! Dashboard atualizado.'),
+          duration: Duration(seconds: 3),
+        ),
+      );
+    }
   }
 
   Future<void> _checkForUpdates() async {

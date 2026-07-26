@@ -1,9 +1,8 @@
 import 'dart:convert';
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
 import 'api_client.dart';
+import 'user_service.dart';
 
 class AuthService {
   final Dio _dio = ApiClient().dio;
@@ -36,19 +35,7 @@ class AuthService {
       );
 
       // Sincroniza FCM Token com o backend
-      if (!kIsWeb) {
-        try {
-          final fcmToken = await FirebaseMessaging.instance.getToken();
-          if (fcmToken != null) {
-            await _dio.put(
-              '/users/me/fcm-token',
-              data: {'fcm_token': fcmToken},
-            );
-          }
-        } catch (e) {
-          print('Erro ao salvar FCM token: $e');
-        }
-      }
+      await UserService().syncFcmToken();
 
     } on DioException catch (e) {
       throw Exception(_getErrorMessage(e));

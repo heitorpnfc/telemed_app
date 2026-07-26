@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'api_client.dart';
 
 class UserService {
@@ -67,6 +69,18 @@ class UserService {
       await _storage.delete(key: 'refresh_token');
     } on DioException catch (e) {
       throw Exception(_getErrorMessage(e));
+    }
+  }
+
+  Future<void> syncFcmToken() async {
+    if (kIsWeb) return;
+    try {
+      final fcmToken = await FirebaseMessaging.instance.getToken();
+      if (fcmToken != null) {
+        await _dio.post('/users/me/fcm-token', data: {'fcm_token': fcmToken});
+      }
+    } catch (e) {
+      debugPrint('Erro ao sincronizar FCM token: $e');
     }
   }
 

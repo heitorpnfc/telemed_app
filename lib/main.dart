@@ -10,6 +10,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 
 import 'services/notification_service.dart';
+import 'services/user_service.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -47,6 +48,10 @@ void main() async {
           }
         },
       );
+
+      FirebaseMessaging.instance.onTokenRefresh.listen((token) {
+        UserService().syncFcmToken();
+      });
     } catch (e) {
       print('Erro ao inicializar serviços: $e');
     }
