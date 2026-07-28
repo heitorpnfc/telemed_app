@@ -2,7 +2,7 @@ name: telemed_app
 description: Aplicativo para controle de caixa de remédios.
 publish_to: 'none'
 
-version: 1.0.7+7
+version: 1.0.8+8
 
 environment:
   sdk: ^3.5.0
@@ -23,6 +23,7 @@ dependencies:
   alarm: ^5.5.0
   package_info_plus: ^10.2.1
   path_provider: ^2.1.6
+  syncfusion_flutter_pdfviewer: ^34.1.32
 
 dev_dependencies:
   flutter_test:
