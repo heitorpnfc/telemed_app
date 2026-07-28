@@ -77,7 +77,7 @@ class UserService {
     try {
       final fcmToken = await FirebaseMessaging.instance.getToken();
       if (fcmToken != null) {
-        await _dio.post('/users/me/fcm-token', data: {'fcm_token': fcmToken});
+        await _dio.put('/users/me/fcm-token', data: {'fcm_token': fcmToken});
       }
     } catch (e) {
       debugPrint('Erro ao sincronizar FCM token: $e');
