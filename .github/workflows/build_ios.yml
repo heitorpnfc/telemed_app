@@ -21,17 +21,29 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
+      - name: Setup CocoaPods
+        uses: maxim-lobanov/setup-cocoapods@v1
+        with:
+          podfile-path: ios/Podfile
+
       - name: Setup Flutter SDK
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
           cache: true
 
-      - name: Get Dependencies
-        run: flutter pub get
+      - name: Prepare Build Directories & Dependencies
+        run: |
+          mkdir -p build/ios/SourcePackages
+          flutter pub get
+          cd ios
+          pod install || true
+          cd ..
 
       - name: Build iOS App (Unsigned Release)
-        run: flutter build ios --release --no-codesign
+        run: |
+          mkdir -p build/ios/SourcePackages
+          flutter build ios --release --no-codesign
 
       - name: Package Payload to IPA
         run: |
