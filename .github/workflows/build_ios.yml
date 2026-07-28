@@ -27,17 +27,11 @@ jobs:
           channel: 'stable'
           cache: true
 
-      - name: Create Build Directories
-        run: |
-          mkdir -p build/ios/SourcePackages
-          mkdir -p build/macos/SourcePackages
-          mkdir -p build/native_assets
+      - name: Disable Experimental Swift Package Manager
+        run: flutter config --no-enable-swift-package-manager
 
       - name: Get Dependencies
         run: flutter pub get
-
-      - name: Generate iOS Configuration & Pods
-        run: flutter build ios --config-only --no-codesign
 
       - name: Build iOS App (Unsigned Release)
         run: flutter build ios --release --no-codesign
