@@ -34,7 +34,12 @@ jobs:
         run: flutter pub get
 
       - name: Build iOS App (Unsigned Release)
-        run: flutter build ios --release --no-codesign
+        run: |
+          flutter build ios --release --no-codesign || true
+          if [ ! -d "build/ios/iphoneos/Runner.app" ]; then
+            echo "Building via xcodebuild..."
+            xcodebuild -workspace ios/Runner.xcworkspace -scheme Runner -configuration Release -sdk iphoneos CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" BUILD_DIR=build/ios build
+          fi
 
       - name: Package Payload to IPA
         run: |
